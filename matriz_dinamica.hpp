@@ -11,10 +11,15 @@
 #include "sqlite3/sqlite3.h"
 using namespace std;
 
+int rando(int maximo, int minimo){
+    return (rand()%maximo + minimo);
+}
+
 void conection_database(string arr, string arr2, bool achado){
     sqlite3* DB;
     int resposta = {0};
     char* mensagem_erro;
+    string erro;
     string comando{""};
     int possui = (achado) ? 1 : 0;
     mutex mute;
@@ -24,9 +29,17 @@ void conection_database(string arr, string arr2, bool achado){
     cout << "id this thead: " << this_thread::get_id() << "\n";
     resposta = sqlite3_open("BancoDados.db" , &DB);
     resposta = sqlite3_exec(DB, comando.c_str(), NULL, 0, &mensagem_erro);
+    erro = sqlite3_errmsg(DB);
+
+    if(erro == "no such table: dinamica"){
+        comando = "create table dinamica (id integer not null primary key autoincrement, matriz text not null, vetor text not null, possui integer not null);";
+        resposta = sqlite3_exec(DB, comando.c_str(), NULL, 0, &mensagem_erro);
+        comando = "insert into dinamica (matriz, vetor, possui) values ('" + arr + "' , '" + arr2 + "', '" + to_string(possui) + "');";
+        resposta = sqlite3_exec(DB, comando.c_str(), NULL, 0, &mensagem_erro);
+    }
 
     if (resposta != SQLITE_OK) {
-        cerr << "erro: [" << sqlite3_errmsg(DB) <<  "]...\n" << endl;
+        cerr << "erro: " << sqlite3_errmsg(DB) <<  "...\n" << endl;
         sqlite3_free(mensagem_erro);
     }
 
@@ -39,15 +52,14 @@ void execucao(const unsigned int linha, const unsigned int coluna, unsigned int 
     bool numeros_iguais{false};
     unsigned int total_numero_encotrados{0};
     string matriz_string{""}, vetor_string{""};
-    mutex mute;
-    lock_guard<mutex> lguard(mute);
-
-    srand(time(NULL));
     for(size_t a=0; a<linha; a++){
-        vetor_verificador[a] = (rand()%+numero_maximo) + 1;
         for(size_t b=0; b<coluna; b++){
-            matriz[a][b] = (rand()%+numero_maximo) + 1;
+            matriz[a][b] = rando(numero_maximo, 1);
         }
+    }
+
+    for(size_t a=0; a<linha; a++){
+        vetor_verificador[a] = rando(numero_maximo, 1);
     }
 
     for(size_t a=0; a<linha; a++){
@@ -122,8 +134,9 @@ void multi_threads(){
     if(numero_maximo < 1)numero_maximo = 1;
     if(numero_maximo > 255)numero_maximo = 255;
 
-    threads[0] = thread(execucao, linha_thread1, coluna_thread1, numero_maximo);
-    threads[1] = thread(execucao, linha_thread2, coluna_thread2, numero_maximo);
+    for(size_t t=0; t<numero_threads_uso; t++){
+        threads[t] = thread(execucao, l, c, numero_maximo);
+    }
 
     for(size_t a=0; a<numero_threads_uso; a++){
         threads[a].join();
