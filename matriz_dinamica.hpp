@@ -11,11 +11,23 @@
 #include "sqlite3/sqlite3.h"
 using namespace std;
 
-int rando(int maximo, int minimo){
+static int callback(void *data, int argc, char **argv, char **azColName){
+   int i;
+   //fprintf(stderr, "%s: ", (const char*)data);
+   
+   for(i = 0; i<argc; i++){
+      printf("%s \t %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
+   }
+   
+   printf("\n");
+   return 0;
+}
+
+int randomico(int maximo, int minimo){
     return (rand()%maximo + minimo);
 }
 
-void conection_database(string arr, string arr2, bool achado){
+void conection_database(string arr="", string arr2="", bool achado=0){
     sqlite3* DB;
     int resposta = {0};
     char* mensagem_erro;
@@ -24,8 +36,8 @@ void conection_database(string arr, string arr2, bool achado){
     int possui = (achado) ? 1 : 0;
     mutex mute;
     comando = "insert into dinamica (matriz, vetor, possui) values ('" + arr + "' , '" + arr2 + "', '" + to_string(possui) + "');";
+    //comando = "select * from dinamica;";
 
-    lock_guard<mutex> lguard(mute);
     cout << "id this thead: " << this_thread::get_id() << "\n";
     resposta = sqlite3_open("BancoDados.db" , &DB);
     resposta = sqlite3_exec(DB, comando.c_str(), NULL, 0, &mensagem_erro);
@@ -54,12 +66,12 @@ void execucao(const unsigned int linha, const unsigned int coluna, unsigned int 
     string matriz_string{""}, vetor_string{""};
     for(size_t a=0; a<linha; a++){
         for(size_t b=0; b<coluna; b++){
-            matriz[a][b] = rando(numero_maximo, 1);
+            matriz[a][b] = randomico(numero_maximo, 1);
         }
     }
 
     for(size_t a=0; a<linha; a++){
-        vetor_verificador[a] = rando(numero_maximo, 1);
+        vetor_verificador[a] = randomico(numero_maximo, 1);
     }
 
     for(size_t a=0; a<linha; a++){
@@ -124,21 +136,23 @@ void multi_threads(){
     cin >> l >> c;
     if(l < 2 && c < 2){ l = 2; c = 2; }
 
-    unsigned int linha_thread1 = l / 2;
-    unsigned int coluna_thread1 = c / 2;
-    unsigned int linha_thread2 = l - linha_thread1;
-    unsigned int coluna_thread2 = c - coluna_thread1;
-
     printf("digite um valor maximo para matriz receber [1/255]: ");
     cin >> numero_maximo;
     if(numero_maximo < 1)numero_maximo = 1;
     if(numero_maximo > 255)numero_maximo = 255;
 
-    for(size_t t=0; t<numero_threads_uso; t++){
-        threads[t] = thread(execucao, l, c, numero_maximo);
+    unsigned int tarefas_threads =  vezes / numero_threads_uso;
+    if((vezes%numero_threads_uso) < 1)
+        tarefas_threads++;
+
+    for(int t=0; t<tarefas_threads; t++){
+        for(size_t a=0; a<numero_threads_uso; a++){
+            threads[a] = thread(execucao, l, c, numero_maximo);
+        }
+
+        for(size_t a=0; a<numero_threads_uso; a++){
+            threads[a].join();
+        }
     }
 
-    for(size_t a=0; a<numero_threads_uso; a++){
-        threads[a].join();
-    }
 }
