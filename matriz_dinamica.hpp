@@ -11,59 +11,69 @@
 #include "sqlite3/sqlite3.h"
 using namespace std;
 
-static int callback(void *data, int argc, char **argv, char **azColName){
-   int i;
-   //fprintf(stderr, "%s: ", (const char*)data);
-   
-   for(i = 0; i<argc; i++){
-      printf("%s \t %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
-   }
-   
-   printf("\n");
-   return 0;
-}
+class BancoDados {
+    private:
+        sqlite3* DB;
+        bool resposta;
+        char* mensagem_erro;
+        string erro, comando;
+
+        static int callback(void *data, int argc, char **argv, char **azColName){
+            int i;
+            //fprintf(stderr, "%s: ", (const char*)data);
+            
+            for(i = 0; i<argc; i++){
+                printf("%s \t %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
+            }
+            
+            printf("\n");
+            return 0;
+        }
+
+    public:
+        BancoDados(const char* name) : resposta{false}, mensagem_erro{""}, erro{""}, comando{""} {
+            resposta = sqlite3_open(name, &DB);
+            if (resposta != SQLITE_OK){
+                cerr << "erro: [" << sqlite3_errmsg(DB) <<  "]\n" << endl; 
+                sqlite3_free(mensagem_erro);
+                exit(-1);
+            }
+        }
+
+        ~BancoDados(){
+            sqlite3_close(DB);
+        }
+
+        void inserir(string arr, string arr2, bool possui){
+            cout << "this thread: " << this_thread::get_id() << endl;
+            comando = "insert into matriz_dinamica (matriz, vetor, possui) values ('" + arr + "' , '" + arr2 + "', '" + to_string(possui) + "');";
+            resposta = sqlite3_exec(DB, comando.c_str(), NULL, 0, &mensagem_erro);
+            erro = sqlite3_errmsg(DB);
+
+            if(erro == "no such table: matriz_dinamica"){
+                comando = "create table matriz_dinamica (id integer not null primary key autoincrement, matriz text not null, vetor text not null, possui bool not null);";
+                resposta = sqlite3_exec(DB, comando.c_str(), NULL, 0, &mensagem_erro);
+                comando = "insert into matriz_dinamica (matriz, vetor, possui) values ('" + arr + "' , '" + arr2 + "', '" + to_string(possui) + "');";
+                resposta = sqlite3_exec(DB, comando.c_str(), NULL, 0, &mensagem_erro);
+            }
+
+            if (resposta != SQLITE_OK) {
+                cerr << "erro: [" << sqlite3_errmsg(DB) <<  "]\n" << endl;
+                sqlite3_free(mensagem_erro);
+                sqlite3_close(DB);
+                exit(-1);
+            }
+        }
+
+};
 
 int randomico(int maximo, int minimo){
     return (rand()%maximo + minimo);
 }
 
-void conection_database(string arr, string arr2, bool achado){
-    sqlite3* DB;
-    int resposta = {0};
-    char* mensagem_erro;
-    string erro{""}, comando{""};
-    int possui = (achado) ? 1 : 0;
+void conection_database(string arr, string arr2, bool achado, sqlite3* DB){ }
 
-    mutex mute;
-    lock_guard<mutex> guard(mute);
-    resposta = sqlite3_open("BancoDados.db" , &DB);
-
-    if (resposta != SQLITE_OK){
-        cerr << "erro: [" << sqlite3_errmsg(DB) <<  "]\n" << endl;
-        sqlite3_free(mensagem_erro);
-        exit(-1);
-    }
-
-    comando = "insert into matriz_dinamica (matriz, vetor, possui) values ('" + arr + "' , '" + arr2 + "', '" + to_string(achado) + "');";
-    resposta = sqlite3_exec(DB, comando.c_str(), NULL, 0, &mensagem_erro);
-    erro = sqlite3_errmsg(DB);
-
-    if(erro == "no such table: matriz_dinamica"){
-        comando = "create table matriz_dinamica (id integer not null primary key autoincrement, matriz text not null, vetor text not null, possui bool not null);";
-        resposta = sqlite3_exec(DB, comando.c_str(), NULL, 0, &mensagem_erro);
-        comando = "insert into matriz_dinamica (matriz, vetor, possui) values ('" + arr + "' , '" + arr2 + "', '" + to_string(achado) + "');";
-        resposta = sqlite3_exec(DB, comando.c_str(), NULL, 0, &mensagem_erro);
-    }
-
-    if (resposta != SQLITE_OK) {
-        cerr << "erro: " << sqlite3_errmsg(DB) <<  "...\n" << endl;
-        sqlite3_free(mensagem_erro);
-    }
-
-    sqlite3_close(DB);
-}
-
-void execucao(const unsigned int linha, const unsigned int coluna, unsigned int numero_maximo){
+void execucao(const unsigned int linha, const unsigned int coluna, unsigned int numero_maximo, sqlite3* DB){
     unsigned int matriz[linha][coluna];
     unsigned int vetor_verificador[coluna];
     bool numeros_iguais{false}, pular{false};
@@ -112,10 +122,14 @@ void execucao(const unsigned int linha, const unsigned int coluna, unsigned int 
             vetor_string += ",";
     }   
     vetor_string += "];";
-    conection_database(matriz_string, vetor_string, numeros_iguais);
+
+    mutex mute;
+    lock_guard<mutex> lguard(mute);
+    conection_database(matriz_string, vetor_string, numeros_iguais, DB);
 }
 
 void unique_thread(){
+
     unsigned int linha{2}, coluna{2}, numero_maximo{1}, vezes{1};
     printf("quantas matrizes dejesa colocar no danco de dados: ");
     cin >> vezes;
@@ -131,11 +145,19 @@ void unique_thread(){
     if(numero_maximo > 255)numero_maximo = 255;
 
     for(int a=0; a<vezes; a++){
-        execucao(linha, coluna, numero_maximo);
+        execucao(linha, coluna, numero_maximo, DB);
     }
 }
 
 void multi_threads(){
+    sqlite3* DB; char* mensagem_erro;
+    int resposta = sqlite3_open("BancoDados.db", &DB);
+    if (resposta != SQLITE_OK){
+        cerr << "erro: [" << sqlite3_errmsg(DB) <<  "]\n" << endl; 
+        sqlite3_free(mensagem_erro);
+        exit(-1);
+    }
+
     unsigned int numero_threads_hardware = thread::hardware_concurrency();
     unsigned int numero_threads_uso = numero_threads_hardware - 1;
     vector<thread> threads(numero_threads_uso);
@@ -159,7 +181,7 @@ void multi_threads(){
 
     for(int t=0; t<tarefas_threads; t++){
         for(size_t a=0; a<numero_threads_uso; a++){
-            threads[a] = thread(execucao, linha, coluna, numero_maximo);
+            threads[a] = thread(execucao, linha, coluna, numero_maximo, DB);
         }
 
         for(size_t a=0; a<numero_threads_uso; a++){
