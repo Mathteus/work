@@ -3,7 +3,6 @@ using namespace std;
 
 int main(int argv, char** argc){
     srand(time(NULL));
-    unique_thread();
-    //conection_database();
+    multi_threads();
     return 0;
 }
