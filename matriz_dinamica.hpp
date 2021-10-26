@@ -37,9 +37,6 @@ void conection_database(string arr, string arr2, bool achado){
     mutex mute;
     lock_guard<mutex> guard(mute);
     resposta = sqlite3_open("BancoDados.db" , &DB);
-    comando = "insert into dinamica (matriz, vetor, possui) values ('" + arr + "' , '" + arr2 + "', '" + to_string(achado) + "');";
-    resposta = sqlite3_exec(DB, comando.c_str(), NULL, 0, &mensagem_erro);
-    erro = sqlite3_errmsg(DB);
 
     if (resposta != SQLITE_OK){
         cerr << "erro: [" << sqlite3_errmsg(DB) <<  "]\n" << endl;
@@ -47,10 +44,14 @@ void conection_database(string arr, string arr2, bool achado){
         exit(-1);
     }
 
-    if(erro == "no such table: dinamica"){
-        comando = "create table dinamica (id integer not null primary key autoincrement, matriz text not null, vetor text not null, possui integer not null);";
+    comando = "insert into matriz_dinamica (matriz, vetor, possui) values ('" + arr + "' , '" + arr2 + "', '" + to_string(achado) + "');";
+    resposta = sqlite3_exec(DB, comando.c_str(), NULL, 0, &mensagem_erro);
+    erro = sqlite3_errmsg(DB);
+
+    if(erro == "no such table: matriz_dinamica"){
+        comando = "create table matriz_dinamica (id integer not null primary key autoincrement, matriz text not null, vetor text not null, possui bool not null);";
         resposta = sqlite3_exec(DB, comando.c_str(), NULL, 0, &mensagem_erro);
-        comando = "insert into dinamica (matriz, vetor, possui) values ('" + arr + "' , '" + arr2 + "', '" + to_string(achado) + "');";
+        comando = "insert into matriz_dinamica (matriz, vetor, possui) values ('" + arr + "' , '" + arr2 + "', '" + to_string(achado) + "');";
         resposta = sqlite3_exec(DB, comando.c_str(), NULL, 0, &mensagem_erro);
     }
 
