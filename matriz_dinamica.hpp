@@ -115,14 +115,14 @@ void execucao(const unsigned int linha, const unsigned int coluna, unsigned int 
 }
 
 void unique_thread(){
-    unsigned int l{2}, c{2}, numero_maximo{1}, vezes{1};
+    unsigned int linha{2}, coluna{2}, numero_maximo{1}, vezes{1};
     printf("quantas matrizes dejesa colocar no danco de dados: ");
     cin >> vezes;
 
     printf("Digite o numero de linhas e colunas separados por um espaço: ");
-    cin >> l >> c;
-    if(l < 2)l = 2; 
-    if(c < 2)c = 2;
+    cin >> linha >> coluna;
+    if(linha < 2)linha = 2; 
+    if(coluna < 2)coluna = 2;
 
     printf("digite um valor maximo para matriz receber [1/255]: ");
     cin >> numero_maximo;
@@ -130,7 +130,7 @@ void unique_thread(){
     if(numero_maximo > 255)numero_maximo = 255;
 
     for(int a=0; a<vezes; a++){
-        execucao(l, c, numero_maximo);
+        execucao(linha, coluna, numero_maximo);
     }
 }
 
@@ -139,14 +139,14 @@ void multi_threads(){
     unsigned int numero_threads_uso = numero_threads_hardware - 1;
     vector<thread> threads(numero_threads_uso);
 
-    unsigned int l{2}, c{2}, numero_maximo{1}, vezes{1};
+    unsigned int linha{2}, coluna{2}, numero_maximo{1}, vezes{1};
     printf("quantas matrizes dejesa colocar no danco de dados: ");
     cin >> vezes;
 
     printf("Digite o numero de linhas e colunas separados por um espaço: ");
-    cin >> l >> c;
-    if(l < 2)l = 2; 
-    if(c < 2)c = 2;
+    cin >> linha >> coluna;
+    if(linha < 2)linha = 2; 
+    if(coluna < 2)coluna = 2;
 
     printf("digite um valor maximo para matriz receber [1/255]: ");
     cin >> numero_maximo;
@@ -158,7 +158,7 @@ void multi_threads(){
 
     for(int t=0; t<tarefas_threads; t++){
         for(size_t a=0; a<numero_threads_uso; a++){
-            threads[a] = thread(execucao, l, c, numero_maximo);
+            threads[a] = thread(execucao, linha, coluna, numero_maximo);
         }
 
         for(size_t a=0; a<numero_threads_uso; a++){
