@@ -14,6 +14,7 @@
 #include <shared_mutex>
 #include "sqlite3/sqlite3.h"
 #include "MpScQueue.h"
+#include "sthread.hpp"
 using namespace std;
 using namespace chrono;
 typedef unsigned int unit;
@@ -37,8 +38,7 @@ private:
 
 public:
     atomic<unit> acessados;
-    BancoDados(const char* name) : resposta(false), erro(""), comando(""), mensagem_erro(""), acessados(0) {
-        cout << boolalpha << "ponteiro esta livre de bloqueio: " << (DB.is_lock_free() ? "yes\n" : "no\n");
+    BancoDados(const char* name) : resposta(false), erro(""), comando(""), acessados(0) {
         resposta = sqlite3_open(name, reinterpret_cast<sqlite3**>(&DB));
         if (resposta != SQLITE_OK){
             cerr << "erro: [" << sqlite3_errmsg(DB) << "]\n"
@@ -56,8 +56,8 @@ public:
 
     void inserir(string arr, string arr2, bool possui){
         lock_guard<mutex> lguard(mute);
-        unit porcetagem = acessados * 100 / 5000;
-        cout << "carregando " << porcetagem << "%\n";
+        //unit porcetagem = acessados * 100 / 5000;
+        //cout << "carregando " << porcetagem << "%\n";
         comando = "insert into dinamica (matriz, vetor, possui) values ('" + arr + "' , '" + arr2 + "', '" + to_string(possui) + "');";
         resposta = sqlite3_exec(DB, comando.c_str(), NULL, 0, &mensagem_erro);
         erro = sqlite3_errmsg(DB);
@@ -80,7 +80,7 @@ public:
             exit(-1);
         }
 
-        acessados++;
+        //acessados++;
     }
 
     void select(){
@@ -174,12 +174,12 @@ void unique_thread(){
     if (numero_maximo < 1) numero_maximo = 1;
     if (numero_maximo > 255) numero_maximo = 255;
 
-    steady_clock::time_point t1 = steady_clock::now();
+    steady_clock::time_point time1 = steady_clock::now();
     for (int a = 0; a < vezes; a++){
         execucao(linha, coluna, numero_maximo, bancodados);
     }
-    steady_clock::time_point t2 = steady_clock::now();
-    duration<double> tempo = duration_cast<duration<double>>(t2 - t1);
+    steady_clock::time_point time2 = steady_clock::now();
+    duration<double> tempo = duration_cast<duration<double>>(time2 - time1);
     cout << "resultado em unico thread:\n";
     cout << "programa demorou " << tempo.count() << " segundos para alocar " << bancodados->acessados.load() << " matrizes no banco de dados..\n";
 }
@@ -188,7 +188,6 @@ void multi_threads(){
     shared_ptr<BancoDados> bancodados(new BancoDados("BancoDados.db"));
     unit numero_threads_hardware = thread::hardware_concurrency();
     unit numero_threads_uso = numero_threads_hardware - 1;
-    vector<thread> threads(numero_threads_uso);
     unit linha{2}, coluna{2}, numero_maximo{1}, vezes{1};
 
     printf("quantas matrizes dejesa colocar no danco de dados: ");
@@ -209,22 +208,19 @@ void multi_threads(){
     if ((tarefas_threads % numero_threads_uso) != 0)
         tarefas_threads++;
 
-    steady_clock::time_point t1 = steady_clock::now();
+    steady_clock::time_point time1 = steady_clock::now();
     for (int t = 0; t < tarefas_threads; t++){
         for (size_t a = 0; a < numero_threads_uso; a++){
-            threads[a] = thread(execucao, linha, coluna, numero_maximo, bancodados);
-        }
-
-        for (size_t a = 0; a < numero_threads_uso; a++){
-            threads[a].join();
+            unique_ptr<SThread> threads(new SThread(thread(execucao, linha, coluna, numero_maximo, bancodados)));   
         }
     }
-    steady_clock::time_point t2 = steady_clock::now();
-    duration<double> tempo = duration_cast<duration<double>>(t2 - t1);
+    steady_clock::time_point time2 = steady_clock::now();
+    duration<double> tempo = duration_cast<duration<double>>(time2 - time1);
     cout << "resultado em multi thread:\n";
     cout << "programa demorou " << tempo.count() << " segundos para alocar " << bancodados->acessados.load() << " matrizes no banco de dados..\n";
 }
 
+/*
 void mpsc_queue(){
     shared_ptr<BancoDados> bancodados(new BancoDados("BancoDados.db"));
     unsigned int numero_threads_hardware = thread::hardware_concurrency();
@@ -250,19 +246,15 @@ void mpsc_queue(){
     if((tarefas_threads%numero_threads_uso) != 0)
         tarefas_threads++;
 
-    steady_clock::time_point t1 = steady_clock::now();
+    steady_clock::time_point time1 = steady_clock::now();
     for(int t=0; t<tarefas_threads; t++){
         for(size_t a=0; a<numero_threads_uso; a++){
             threads.enqueue(thread(execucao, linha, coluna, numero_maximo, bancodados));
         }
-
-        for(size_t a=0; a<numero_threads_uso; a++){
-            threads.dequeue(threads.getData()->currbuffer->data.join());
-        }
     }
-    
-    steady_clock::time_point t2 = steady_clock::now();
-    duration<double> tempo = duration_cast<duration<double>>(t2 - t1);
-    cout << "resultado em multi thread:\n";
+    steady_clock::time_point time2 = steady_clock::now();
+    duration<double> tempo = duration_cast<duration<double>>(time2 - time1);
+    cout << "resultado com mpsc queue:\n";
     cout << "programa demorou " << tempo.count() << " segundos para alocar " << bancodados->acessados.load() << " matrizes no banco de dados..\n";
 }
+*/
