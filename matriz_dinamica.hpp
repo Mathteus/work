@@ -20,30 +20,26 @@ typedef unsigned int unit;
 
 class BancoDados{
 private:
-    static int callback(void *data, int argc, char **argv, char **azColName)
-{
-        int i;
+    static int callback(void *data, int argc, char **argv, char **azColName){
         //fprintf(stderr, "%s: ", (const char*)data);
-        for (i = 0; i < argc; i++){
+        for (int i = 0; i < argc; i++){
             printf("%s \t %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
         }
-
         printf("\n");
         return 0;
     }
 
-    atomic<sqlite3 *> DB;
+    atomic<sqlite3*> DB;
     bool resposta;
-    char *mensagem_erro;
-    string erro, comando;
+    string erro, comando; 
+    char* mensagem_erro;
     mutex mute;
 
 public:
-    atomic<unit> acessados{0};
-    BancoDados(const char *name) : resposta{false}, erro{""}, comando{""}
-    {
+    atomic<unit> acessados;
+    BancoDados(const char* name) : resposta(false), erro(""), comando(""), mensagem_erro(""), acessados(0) {
         cout << boolalpha << "ponteiro esta livre de bloqueio: " << (DB.is_lock_free() ? "yes\n" : "no\n");
-        resposta = sqlite3_open(name, reinterpret_cast<sqlite3 **>(&DB));
+        resposta = sqlite3_open(name, reinterpret_cast<sqlite3**>(&DB));
         if (resposta != SQLITE_OK){
             cerr << "erro: [" << sqlite3_errmsg(DB) << "]\n"
                  << endl;
@@ -52,15 +48,13 @@ public:
         }
     }
 
-    ~BancoDados()
-    {
+    ~BancoDados(){
         sqlite3_close(DB);
         sqlite3_free(mensagem_erro);
         exit(-1);
     }
 
-    void inserir(string arr, string arr2, bool possui)
-    {
+    void inserir(string arr, string arr2, bool possui){
         lock_guard<mutex> lguard(mute);
         unit porcetagem = acessados * 100 / 5000;
         cout << "carregando " << porcetagem << "%\n";
@@ -89,8 +83,7 @@ public:
         acessados++;
     }
 
-    void select()
-    {
+    void select(){
         lock_guard<mutex> lguard(mute);
         comando = "select * from dinamica;";
         resposta = sqlite3_exec(DB, comando.c_str(), callback, 0, &mensagem_erro);
@@ -105,13 +98,11 @@ public:
     }
 };
 
-int randomico(int maximo, int minimo)
-{
+inline int randomico(int maximo, int minimo){
     return (rand() % maximo + minimo);
 }
 
-void execucao(const unsigned int linha, const unsigned int coluna, unsigned int numero_maximo, shared_ptr<BancoDados> bancodados)
-{
+void execucao(const unsigned int linha, const unsigned int coluna, unsigned int numero_maximo, shared_ptr<BancoDados> bancodados){
     unit matriz[linha][coluna];
     unit vetor_verificador[coluna];
     bool numeros_iguais{false}, pular{false};
@@ -166,8 +157,7 @@ void execucao(const unsigned int linha, const unsigned int coluna, unsigned int 
     bancodados->inserir(matriz_string, vetor_string, numeros_iguais);
 }
 
-void unique_thread()
-{
+void unique_thread(){
     shared_ptr<BancoDados> bancodados(new BancoDados("BancoDados.db"));
     unit linha{2}, coluna{2}, numero_maximo{1}, vezes{1};
 
@@ -194,8 +184,7 @@ void unique_thread()
     cout << "programa demorou " << tempo.count() << " segundos para alocar " << bancodados->acessados.load() << " matrizes no banco de dados..\n";
 }
 
-void multi_threads()
-{
+void multi_threads(){
     shared_ptr<BancoDados> bancodados(new BancoDados("BancoDados.db"));
     unit numero_threads_hardware = thread::hardware_concurrency();
     unit numero_threads_uso = numero_threads_hardware - 1;
@@ -236,7 +225,6 @@ void multi_threads()
     cout << "programa demorou " << tempo.count() << " segundos para alocar " << bancodados->acessados.load() << " matrizes no banco de dados..\n";
 }
 
-/*
 void mpsc_queue(){
     shared_ptr<BancoDados> bancodados(new BancoDados("BancoDados.db"));
     unsigned int numero_threads_hardware = thread::hardware_concurrency();
@@ -278,4 +266,3 @@ void mpsc_queue(){
     cout << "resultado em multi thread:\n";
     cout << "programa demorou " << tempo.count() << " segundos para alocar " << bancodados->acessados.load() << " matrizes no banco de dados..\n";
 }
-*/
