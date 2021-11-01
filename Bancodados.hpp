@@ -5,6 +5,7 @@
 #include <memory>
 #include "sqlite3/sqlite3.h"
 using namespace std;
+typedef unsigned int unit;
 
 class BancoDados{
 private:
@@ -42,43 +43,33 @@ public:
     }
 
     void inserir(string arr, string arr2, bool possui){
-        lock_guard<mutex> lguard(mute);
-        //unit porcetagem = acessados * 100 / 5000;
-        //cout << "carregando " << porcetagem << "%\n";
         comando = "insert into dinamica (matriz, vetor, possui) values ('" + arr + "' , '" + arr2 + "', '" + to_string(possui) + "');";
-        resposta = sqlite3_exec(DB, comando.c_str(), NULL, 0, &mensagem_erro);
+        resposta = sqlite3_exec(DB.load(std::memory_order_seq_cst), comando.c_str(), NULL, 0, &mensagem_erro);
         erro = sqlite3_errmsg(DB);
 
         if (erro == "no such table: dinamica"){
             comando = "create table dinamica (id integer not null primary key autoincrement, matriz text not null, vetor text not null, possui bool not null);";
-            resposta = sqlite3_exec(DB, comando.c_str(), NULL, 0, &mensagem_erro);
+            resposta = sqlite3_exec(DB.load(std::memory_order_seq_cst), comando.c_str(), NULL, 0, &mensagem_erro);
             comando = "insert into dinamica (matriz, vetor, possui) values ('" + arr + "' , '" + arr2 + "', '" + to_string(possui) + "');";
-            resposta = sqlite3_exec(DB, comando.c_str(), NULL, 0, &mensagem_erro);
-        }
-
-        if (resposta == SQLITE_BUSY){
-            cerr << "erro: [nao foi possui continuar a operacao multiplos threds usando a mesma abertura]\n";
-            exit(-1);
+            resposta = sqlite3_exec(DB.load(std::memory_order_seq_cst), comando.c_str(), NULL, 0, &mensagem_erro);
         }
 
         if (resposta != SQLITE_OK){
-            cerr << "erro: [" << sqlite3_errmsg(DB) << "]\n"
-                 << endl;
+            cerr << "erro: [" << sqlite3_errmsg(DB) << "]\n";
+            sqlite3_free(mensagem_erro);
             exit(-1);
         }
 
-        //acessados++;
+        acessados++;
     }
 
     void select(){
-        lock_guard<mutex> lguard(mute);
         comando = "select * from dinamica;";
-        resposta = sqlite3_exec(DB, comando.c_str(), callback, 0, &mensagem_erro);
+        resposta = sqlite3_exec(DB.load(std::memory_order_seq_cst), comando.c_str(), callback, 0, &mensagem_erro);
         erro = sqlite3_errmsg(DB);
 
         if (resposta != SQLITE_OK){
-            cerr << "erro: [" << sqlite3_errmsg(DB) << "]\n"
-                 << endl;
+            cerr << "erro: [" << sqlite3_errmsg(DB) << "]\n";
             sqlite3_free(mensagem_erro);
             exit(-1);
         }
